@@ -32,7 +32,7 @@
 |:---:|:---:|:---:|
 | ![Light Mode](path/to/screenshot1.png) | ![Dark Mode](path/to/screenshot2.png) | ![Menu](path/to/screenshot3.png) |
 
-*(يرجى استبدال الروابط أعلاه بصور حقيقية من التطبيق بعد رفعه)*
+*
 
 ---
 
