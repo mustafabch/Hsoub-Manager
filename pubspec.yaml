@@ -1,0 +1,50 @@
+name: hsoub_app
+description: Hsoub platforms aggregator.
+publish_to: 'none'
+version: 1.0.5+1
+
+environment:
+  sdk: '>=3.2.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_inappwebview: ^6.0.0
+  shared_preferences: ^2.2.0
+  logger: ^2.0.0
+  permission_handler: ^12.0.1
+  flutter_svg: ^2.0.10
+  cupertino_icons: ^1.0.6
+  workmanager: ^0.9.0
+  flutter_local_notifications: ^19.5.0
+  http: ^1.2.0
+  html: ^0.15.4
+  package_info_plus: ^9.0.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.4
+
+# إعدادات أيقونة التطبيق
+flutter_launcher_icons:
+  android: "launcher_icon"
+  ios: false # تم التعطيل لتفادي خطأ Alpha Channel
+  image_path: "assets/icon/app_icon.png"
+  min_sdk_android: 21
+
+flutter:
+  uses-material-design: true
+  # تعريف المسارات
+  assets:
+    - assets/css/custom.css
+    - assets/logos/
+    - assets/icon/
+    
+  fonts:
+    - family: IBM Plex Sans Arabic
+      fonts:
+        - asset: assets/fonts/IBMPlexSansArabic-Regular.ttf
+        - asset: assets/fonts/IBMPlexSansArabic-Bold.ttf
+          weight: 700
