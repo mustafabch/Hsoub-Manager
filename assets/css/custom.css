@@ -35,14 +35,3 @@ button, input, textarea, select, label {
 
 /* 5. إخفاء الفوتر */
 .footer-global { display: none !important; }
-
-/* 6. الوضع الليلي (Dark Mode Filter) */
-html { 
-    filter: invert(0.92) hue-rotate(180deg) brightness(1.1); 
-    background-color: #1a1a1a !important;
-}
-
-/* استثناء الوسائط (الصور والفيديو) من القلب اللوني */
-img, video, iframe, canvas, svg, .avatar, .user-avatar { 
-    filter: invert(1) hue-rotate(180deg);
-}

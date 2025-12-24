@@ -163,9 +163,9 @@ class _MainScreenState extends State<MainScreen> {
         
         endDrawer: Drawer(
           backgroundColor: _isDarkMode ? _darkSurface : _lightSurface,
-          child: SafeArea( // ✅ إضافة SafeArea للقائمة الجانبية لحمايتها من الأسفل والأعلى
+          child: SafeArea(
             bottom: true, 
-            top: false, // نجعلها false من الأعلى حتى لا يظهر فراغ فوق الهيدر
+            top: false,
             child: Directionality(
               textDirection: TextDirection.rtl, 
               child: Column(
@@ -248,7 +248,6 @@ class _MainScreenState extends State<MainScreen> {
                       Navigator.push(context, MaterialPageRoute(builder: (context) => const AboutScreen()));
                     },
                   ),
-                  // ✅ تم زيادة الهامش السفلي هنا إلى 60 بكسل
                   const SizedBox(height: 60), 
                 ],
               ),
@@ -305,6 +304,218 @@ class _MainScreenState extends State<MainScreen> {
   }
 }
 
+class HsoubWebView extends StatefulWidget {
+  final String url;
+  final bool isDarkMode;
+  final String? customCss;
+  final Function(InAppWebViewController) onControllerCreated;
+
+  const HsoubWebView({
+    super.key, 
+    required this.url, 
+    required this.isDarkMode,
+    this.customCss,
+    required this.onControllerCreated,
+  });
+
+  @override
+  State<HsoubWebView> createState() => _HsoubWebViewState();
+}
+
+class _HsoubWebViewState extends State<HsoubWebView> with AutomaticKeepAliveClientMixin {
+  InAppWebViewController? webViewController;
+  bool _isLoading = true;
+
+  @override
+  bool get wantKeepAlive => true; 
+
+  // ✅ 1. كود الخطوط (يتم حقنه دائماً لضمان الخط في الوضع النهاري والليلي)
+  static const String cssFonts = """
+    @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@100;200;300;400;500;600;700&display=swap');
+    
+    /* تعميم الخط على كامل الموقع مع !important */
+    * { 
+      font-family: 'IBM+Plex+Sans+Arabic', 'IBM Plex Sans Arabic', sans-serif !important; 
+    }
+
+    /* استثناء الأيقونات (FontAwesome وغيرها) حتى لا تختفي */
+    /* نعيدها للوراثة inherit لتأخذ الخط الذي حدده الموقع */
+    .fa, .fas, .far, .fab, .fal, 
+    [class*="icon-"], [class*="hsoub-icon"], .hsoub-icon,
+    i, span[class^="icon-"] {
+        font-family: inherit !important;
+    }
+  """;
+
+  // ✅ 2. كود الوضع الليلي (فلاتر فقط)
+  static const String cssDarkModeContent = """
+    /* قلب الألوان للخلفية */
+    html { filter: invert(0.92) hue-rotate(180deg) brightness(1.1); background-color: #1a1a1a !important; }
+
+    /* إعادة الوسائط والخلفيات لطبيعتها */
+    img, video, iframe, canvas, svg, .video_bg,
+    .avatar, .user-avatar, .product-img, .block-images-unit-background, .show-thumb, .thumb,
+    [style*="background-image"], [style*="background: url"], [style*="background:url"] {
+        filter: invert(1) hue-rotate(180deg) !important;
+    }
+
+    /* استثناء الحاويات الملونة (هيدر مستقل، أيقونات خدمات خمسات) */
+    .hero, .grid-item {
+        filter: invert(1) hue-rotate(180deg) !important;
+    }
+    
+    /* حماية محتوى الحاويات المستثناة من القلب المزدوج */
+    .hero video, .hero-full-height video, 
+    .hero .video_bg, 
+    .grid-item img, .grid-item svg {
+        filter: none !important;
+    }
+
+    /* 🔥 إصلاح خاص لفيديو خمسات (.khamsat-hero) */
+    /* نجبر فيديو خمسات على عدم استخدام الفلتر ليبقى طبيعياً داخل الهيدر */
+    .khamsat-hero video, .khamsat-hero .video_bg {
+         filter: none !important;
+    }
+      .dashboard {
+         background-color: #ffffff !important; /* this fix the white bg in mostaql dashboard */
+    }
+
+    /* إصلاح نصوص هيدر خمسات (لأن الهيدر أصبح ساطعاً، فالنصوص انقلبت للأسود، نعيدها للأبيض) */
+    .khamsat-hero .hero-title, .khamsat-hero p, .khamsat-hero h1, .khamsat-hero h2, .khamsat-hero .hero-form {
+         filter: invert(1) hue-rotate(180deg);
+         text-shadow: 0 0 5px rgba(0,0,0,0.5);
+    }
+  """;
+
+  // دالة التبديل (تضيف/تحذف ملف ستايل الوضع الليلي فقط)
+  void _toggleDarkMode(bool enable) {
+    if (webViewController == null) return;
+
+    if (enable) {
+      String jsCode = """
+        if (!document.getElementById('hsoub-dark-mode-style')) {
+          var style = document.createElement('style');
+          style.id = 'hsoub-dark-mode-style';
+          style.innerHTML = `$cssDarkModeContent`;
+          document.head.appendChild(style);
+        }
+      """;
+      webViewController!.evaluateJavascript(source: jsCode);
+    } else {
+      String jsCode = """
+        var style = document.getElementById('hsoub-dark-mode-style');
+        if (style) { style.remove(); }
+      """;
+      webViewController!.evaluateJavascript(source: jsCode);
+    }
+  }
+
+  @override
+  void didUpdateWidget(HsoubWebView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (webViewController != null) {
+      if (widget.isDarkMode != oldWidget.isDarkMode) {
+        _toggleDarkMode(widget.isDarkMode);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    return Stack(
+      children: [
+        InAppWebView(
+          initialUrlRequest: URLRequest(url: WebUri(widget.url)),
+          initialSettings: InAppWebViewSettings(
+            javaScriptEnabled: true,
+            domStorageEnabled: true,
+            databaseEnabled: true,
+            supportZoom: false,
+          ),
+          onWebViewCreated: (controller) {
+            webViewController = controller;
+            widget.onControllerCreated(controller);
+          },
+          onLoadStart: (controller, url) {
+            setState(() {
+              _isLoading = true;
+            });
+          },
+          onLoadStop: (controller, url) async {
+            // ✅ 1. حقن الخطوط (دائماً وفي كل الأوضاع)
+            // نستخدم injectCSSCode للخطوط لأننا نريدها ثابتة
+            await controller.injectCSSCode(source: cssFonts);
+            
+            // إضافة ملف custom.css الإضافي إذا وجد
+            if (widget.customCss != null) {
+              await controller.injectCSSCode(source: widget.customCss!);
+            }
+            
+            // ✅ 2. تفعيل الوضع الليلي إذا كان مختاراً
+            if (widget.isDarkMode) {
+              _toggleDarkMode(true);
+            }
+
+            // ... (حفظ الكوكيز) ...
+            if (url.toString().contains('hsoub.com') || 
+                url.toString().contains('khamsat.com') ||
+                url.toString().contains('mostaql.com') ||
+                url.toString().contains('baaeed.com') ||
+                url.toString().contains('picalica.com')) {
+              CookieManager cookieManager = CookieManager.instance();
+              List<Cookie> cookies = await cookieManager.getCookies(url: url!);
+              String cookieString = cookies.map((c) => "${c.name}=${c.value}").join("; ");
+              if (cookieString.isNotEmpty) {
+                final prefs = await SharedPreferences.getInstance();
+                await prefs.setString('hsoub_cookies', cookieString);
+              }
+            }
+
+            await Future.delayed(const Duration(milliseconds: 500));
+            if (mounted) {
+              setState(() {
+                _isLoading = false;
+              });
+            }
+          },
+        ),
+        
+        if (_isLoading)
+          Container(
+            color: widget.isDarkMode ? const Color(0xFF181a1f) : Colors.white,
+            width: double.infinity,
+            height: double.infinity,
+            child: Stack(
+              children: [
+                Center(
+                  child: CircularProgressIndicator(
+                    color: widget.isDarkMode ? const Color(0xFF1dbf73) : const Color(0xFFC4740C),
+                  ),
+                ),
+                Align(
+                  alignment: Alignment.bottomCenter,
+                  child: Padding(
+                    padding: const EdgeInsets.only(bottom: 50.0),
+                    child: SvgPicture.network(
+                      "https://static.hsoubcdn.com/footer/assets/images/hsoub-logo.svg",
+                      width: 120, 
+                      colorFilter: ColorFilter.mode(
+                         widget.isDarkMode ? Colors.white : Colors.black87,
+                         BlendMode.srcIn
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+// ... (AboutAppScreen و AboutScreen كما هي دون تغيير)
 class AboutAppScreen extends StatelessWidget {
   const AboutAppScreen({super.key});
 
@@ -598,7 +809,7 @@ class AboutScreen extends StatelessWidget {
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: secondaryColor, 
-                  fontSize: 14,
+                  fontSize: 12,
                   fontFamily: 'IBM Plex Sans Arabic'
                 ),
               ),
@@ -621,170 +832,6 @@ class AboutScreen extends StatelessWidget {
         ),
         child: Icon(icon, color: color, size: 28),
       ),
-    );
-  }
-}
-
-class HsoubWebView extends StatefulWidget {
-  final String url;
-  final bool isDarkMode;
-  final String? customCss;
-  final Function(InAppWebViewController) onControllerCreated;
-
-  const HsoubWebView({
-    super.key, 
-    required this.url, 
-    required this.isDarkMode,
-    this.customCss,
-    required this.onControllerCreated,
-  });
-
-  @override
-  State<HsoubWebView> createState() => _HsoubWebViewState();
-}
-
-class _HsoubWebViewState extends State<HsoubWebView> with AutomaticKeepAliveClientMixin {
-  InAppWebViewController? webViewController;
-  bool _isLoading = true;
-
-  @override
-  bool get wantKeepAlive => true; 
-
-  final String cssDark = """
-    @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@100;200;300;400;500;600;700&display=swap');
-    * { font-family: 'IBM+Plex+Sans+Arabic', 'IBM Plex Sans Arabic', sans-serif !important; }
-    
-    html { filter: invert(0.9) hue-rotate(180deg) brightness(1.1); }
-    img, video, iframe, canvas, svg, .avatar, .user-avatar { 
-      filter: invert(1) hue-rotate(180deg);
-      transform: translateZ(0); 
-    }
-    #header, .header, .navbar, .site-footer {
-      filter: invert(1) hue-rotate(180deg);
-      background-color: #1a1a1a !important; 
-      color: #fff !important;
-    }
-    #header a, .header a, .navbar a, .site-footer a, 
-    #header i, .header i, .navbar i, .site-footer i {
-      color: #fff !important;
-      filter: none !important;
-    }
-    .card, .panel, .box, .white-bg, .bg-white, .content-box, .dropdown-menu {
-      background-color: #fff !important;
-      color: #000 !important;
-    }
-    .btn-primary, .btn-success, .btn-danger {
-      filter: invert(1) hue-rotate(180deg);
-    }
-  """;
-
-  final String cssLightFontFix = """
-    @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@100;200;300;400;500;600;700&display=swap');
-    * { font-family: 'IBM+Plex+Sans+Arabic', 'IBM Plex Sans Arabic', sans-serif !important; }
-  """;
-
-  @override
-  void didUpdateWidget(HsoubWebView oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (webViewController != null) {
-      if (widget.isDarkMode != oldWidget.isDarkMode) {
-        if (widget.isDarkMode) {
-          webViewController?.injectCSSCode(source: cssDark);
-        } else {
-          webViewController?.reload(); 
-        }
-      }
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    super.build(context);
-    return Stack(
-      children: [
-        InAppWebView(
-          initialUrlRequest: URLRequest(url: WebUri(widget.url)),
-          initialSettings: InAppWebViewSettings(
-            javaScriptEnabled: true,
-            domStorageEnabled: true,
-            databaseEnabled: true,
-            supportZoom: false,
-          ),
-          onWebViewCreated: (controller) {
-            webViewController = controller;
-            widget.onControllerCreated(controller);
-          },
-          onLoadStart: (controller, url) {
-            setState(() {
-              _isLoading = true;
-            });
-          },
-          onLoadStop: (controller, url) async {
-            if (widget.customCss != null) {
-              await controller.injectCSSCode(source: widget.customCss!);
-            }
-            if (widget.isDarkMode) {
-              await controller.injectCSSCode(source: cssDark);
-            } else {
-              await controller.injectCSSCode(source: cssLightFontFix);
-            }
-
-            // حفظ الكوكيز لجميع المواقع
-            if (url.toString().contains('hsoub.com') || 
-                url.toString().contains('khamsat.com') ||
-                url.toString().contains('mostaql.com') ||
-                url.toString().contains('baaeed.com') ||
-                url.toString().contains('picalica.com')) {
-                  
-              CookieManager cookieManager = CookieManager.instance();
-              List<Cookie> cookies = await cookieManager.getCookies(url: url!);
-              String cookieString = cookies.map((c) => "${c.name}=${c.value}").join("; ");
-              
-              if (cookieString.isNotEmpty) {
-                final prefs = await SharedPreferences.getInstance();
-                await prefs.setString('hsoub_cookies', cookieString);
-              }
-            }
-
-            await Future.delayed(const Duration(milliseconds: 500));
-            if (mounted) {
-              setState(() {
-                _isLoading = false;
-              });
-            }
-          },
-        ),
-        
-        if (_isLoading)
-          Container(
-            color: widget.isDarkMode ? const Color(0xFF181a1f) : Colors.white,
-            width: double.infinity,
-            height: double.infinity,
-            child: Stack(
-              children: [
-                Center(
-                  child: CircularProgressIndicator(
-                    color: widget.isDarkMode ? const Color(0xFF1dbf73) : const Color(0xFFC4740C),
-                  ),
-                ),
-                Align(
-                  alignment: Alignment.bottomCenter,
-                  child: Padding(
-                    padding: const EdgeInsets.only(bottom: 50.0),
-                    child: SvgPicture.network(
-                      "https://static.hsoubcdn.com/footer/assets/images/hsoub-logo.svg",
-                      width: 120, 
-                      colorFilter: ColorFilter.mode(
-                         widget.isDarkMode ? Colors.white : Colors.black87,
-                         BlendMode.srcIn
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-      ],
     );
   }
 }
