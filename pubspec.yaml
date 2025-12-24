@@ -20,6 +20,7 @@ dependencies:
   http: ^1.2.0
   html: ^0.15.4
   package_info_plus: ^9.0.0
+  url_launcher: ^6.2.0
 
 dev_dependencies:
   flutter_test:
@@ -41,6 +42,7 @@ flutter:
     - assets/css/custom.css
     - assets/logos/
     - assets/icon/
+    - assets/logos/graphixy.svg
     
   fonts:
     - family: IBM Plex Sans Arabic

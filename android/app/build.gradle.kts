@@ -5,7 +5,7 @@ plugins {
 }
 
 android {
-    namespace = "com.mustafabch.hsoub"
+    namespace = "com.graphixy.hsoub"
     
     // يفضل استخدام رقم نسخة مستقرة (مثل 34 أو 35) إلا إذا كنت تستخدم نسخة المطورين
     compileSdk = 36
@@ -25,7 +25,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.mustafabch.hsoub"
+        applicationId = "com.graphixy.hsoub"
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode

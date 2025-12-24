@@ -1,3 +1,4 @@
+import 'dart:ui'; // ✅ ضروري لتعريف الألوان (Color)
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:workmanager/workmanager.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -7,7 +8,6 @@ import 'package:logger/logger.dart';
 
 const String fetchBackground = "fetchBackground";
 
-// إعداد اللوجر (Logger) بتنسيق نظيف
 final logger = Logger(
   printer: PrettyPrinter(
     methodCount: 0,
@@ -24,7 +24,7 @@ void callbackDispatcher() {
   Workmanager().executeTask((task, inputData) async {
     switch (task) {
       case fetchBackground:
-        logger.d("بدأت عملية الفحص في الخلفية... 🕵️‍♂️"); 
+        logger.d("🔍 بدأت عملية الفحص الشامل في الخلفية..."); 
         await NotificationService.checkNotifications();
         break;
     }
@@ -36,6 +36,13 @@ class NotificationService {
   static final FlutterLocalNotificationsPlugin _notificationsPlugin =
       FlutterLocalNotificationsPlugin();
 
+  static final Map<String, String> _platforms = {
+    'خمسات': 'https://khamsat.com',
+    'مستقل': 'https://mostaql.com',
+    'بيكاليكا': 'https://picalica.com',
+    'بعيد': 'https://baaeed.com',
+  };
+
   static Future<void> initialize() async {
     const AndroidInitializationSettings androidSettings =
         AndroidInitializationSettings('@mipmap/launcher_icon');
@@ -45,21 +52,21 @@ class NotificationService {
 
     await _notificationsPlugin.initialize(settings);
 
-    // تفعيل Workmanager
     await Workmanager().initialize(
       callbackDispatcher,
-      // isInDebugMode: true, // فعل هذا السطر فقط إذا أردت رؤية إشعارات تجريبية كثيرة
     );
   }
 
   static Future<void> scheduleBackgroundFetch() async {
     await Workmanager().registerPeriodicTask(
-      "1", 
+      "hsoub_fetch_task_v1", 
       fetchBackground,
       frequency: const Duration(minutes: 15), 
       constraints: Constraints(
         networkType: NetworkType.connected, 
       ),
+      // ✅ التصحيح الأول: استخدام ExistingPeriodicWorkPolicy بدلاً من ExistingWorkPolicy
+      existingWorkPolicy: ExistingPeriodicWorkPolicy.replace, 
     );
   }
 
@@ -68,13 +75,19 @@ class NotificationService {
     final String? cookies = prefs.getString('hsoub_cookies');
 
     if (cookies == null) {
-      logger.i("لا توجد كوكيز مسجلة. تخطي الفحص."); 
+      logger.i("🚫 لا توجد كوكيز مسجلة. يرجى تسجيل الدخول أولاً."); 
       return; 
     }
 
+    for (var entry in _platforms.entries) {
+      await _checkSpecificSite(entry.key, entry.value, cookies);
+    }
+  }
+
+  static Future<void> _checkSpecificSite(String siteName, String url, String cookies) async {
     try {
       final response = await http.get(
-        Uri.parse('https://khamsat.com'),
+        Uri.parse(url),
         headers: {
           'Cookie': cookies,
           'User-Agent': 'Mozilla/5.0 (Linux; Android 10) HsoubApp/1.0',
@@ -83,42 +96,51 @@ class NotificationService {
 
       if (response.statusCode == 200) {
         var document = parser.parse(response.body);
-        // البحث عن أيقونة الإشعارات التي تحتوي على رقم
-        var notificationElements = document.querySelectorAll('.header-notifications .badge, .notifications-count, .message-count');
+        
+        var notificationElements = document.querySelectorAll('.header-notifications .badge, .notifications-count, .message-count, .messages-counter');
+
+        int totalCount = 0;
 
         for (var element in notificationElements) {
           String text = element.text.trim();
           int? count = int.tryParse(text);
-          
-          if (count != null && count > 0) {
-            logger.i("تم العثور على $count إشعار!");
-            await _showNotification(count);
-            break; 
+          if (count != null) {
+            totalCount += count;
           }
         }
+
+        if (totalCount > 0) {
+          logger.i("✅ $siteName: تم العثور على $totalCount تنبيه!");
+          await _showNotification(siteName.hashCode, siteName, totalCount);
+        } else {
+          logger.d("⚪ $siteName: لا توجد تنبيهات.");
+        }
+
       } else {
-        logger.w("فشل تحميل الصفحة: ${response.statusCode}"); 
+        logger.w("⚠️ $siteName: فشل الاتصال (${response.statusCode})"); 
       }
     } catch (e) {
-      logger.e("خطأ في جلب الإشعارات", error: e); 
+      logger.e("❌ خطأ أثناء فحص $siteName", error: e); 
     }
   }
 
-  static Future<void> _showNotification(int count) async {
+  static Future<void> _showNotification(int id, String siteName, int count) async {
+    // ✅ التصحيح الثاني: Color أصبحت معرفة بفضل import 'dart:ui'
     const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
       'hsoub_channel_id',
       'تنبيهات حسوب',
-      channelDescription: 'إشعارات عند وصول رسائل أو تحديثات جديدة',
+      channelDescription: 'إشعارات منصات حسوب',
       importance: Importance.max,
       priority: Priority.high,
+      color: Color(0xFF1dbf73), 
     );
 
     const NotificationDetails details = NotificationDetails(android: androidDetails);
 
     await _notificationsPlugin.show(
-      0,
-      'لديك تنبيهات جديدة',
-      'يوجد $count إشعار جديد في حسابك',
+      id, 
+      'تنبيه من $siteName',
+      'لديك $count إشعارات/رسائل جديدة في $siteName',
       details,
     );
   }

@@ -1,4 +1,4 @@
-package com.mustafabch.hsoub
+package com.graphixy.hsoub
 
 import io.flutter.embedding.android.FlutterActivity
 
